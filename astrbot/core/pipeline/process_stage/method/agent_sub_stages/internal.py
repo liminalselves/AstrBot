@@ -19,6 +19,7 @@ from astrbot.core.message.message_event_result import (
     MessageEventResult,
     ResultContentType,
 )
+from astrbot.core.pipeline.stage import Stage
 from astrbot.core.platform.astr_message_event import AstrMessageEvent
 from astrbot.core.provider.entities import (
     LLMResponse,
@@ -30,7 +31,6 @@ from astrbot.core.utils.session_lock import session_lock_manager
 
 from .....astr_agent_run_util import run_agent, run_live_agent
 from ....context import PipelineContext, call_event_hook
-from ...stage import Stage
 
 
 class InternalAgentSubStage(Stage):
@@ -54,6 +54,7 @@ class InternalAgentSubStage(Stage):
         if isinstance(self.max_step, bool):  # workaround: #2622
             self.max_step = 30
         self.show_tool_use: bool = settings.get("show_tool_use_status", True)
+        self.show_tool_call_result: bool = settings.get("show_tool_call_result", False)
         self.show_reasoning = settings.get("display_reasoning_text", False)
         self.sanitize_context_by_modalities: bool = settings.get(
             "sanitize_context_by_modalities",
@@ -243,6 +244,7 @@ class InternalAgentSubStage(Stage):
                                 tts_provider,
                                 self.max_step,
                                 self.show_tool_use,
+                                self.show_tool_call_result,
                                 show_reasoning=self.show_reasoning,
                             ),
                         ),
@@ -272,6 +274,7 @@ class InternalAgentSubStage(Stage):
                                 agent_runner,
                                 self.max_step,
                                 self.show_tool_use,
+                                self.show_tool_call_result,
                                 show_reasoning=self.show_reasoning,
                             ),
                         ),
@@ -300,6 +303,7 @@ class InternalAgentSubStage(Stage):
                         agent_runner,
                         self.max_step,
                         self.show_tool_use,
+                        self.show_tool_call_result,
                         stream_to_general,
                         show_reasoning=self.show_reasoning,
                     ):
