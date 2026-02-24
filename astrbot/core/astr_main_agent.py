@@ -121,6 +121,12 @@ class MainAgentBuildConfig:
     timezone: str | None = None
     max_quoted_fallback_images: int = 20
     """Maximum number of images injected from quoted-message fallback extraction."""
+    mem0_enabled: bool = False
+    """是否启用 Mem0 长期记忆 + 短期窗口，替代原有上下文机制。"""
+    mem0_config: dict | None = None
+    """Mem0 配置，如 vector_store 等。"""
+    mem0_active_max: int = 30
+    """短期窗口 active 对话最大轮数。"""
 
 
 @dataclass(slots=True)
@@ -246,6 +252,65 @@ async def _apply_file_extract(
                 ),
             },
         )
+
+
+async def _apply_mem0_and_short_term(
+    event: AstrMessageEvent,
+    req: ProviderRequest,
+    config: MainAgentBuildConfig,
+) -> None:
+    """Mem0 长期记忆 + 短期窗口：替换 contexts、注入长期记忆到 system_prompt。"""
+    if not config.mem0_enabled:
+        logger.info(
+            "Mem0 未启用，跳过 Mem0/短期窗口。umo=%s",
+            event.unified_msg_origin,
+        )
+        return
+    try:
+        from astrbot.core.memory.mem0_bridge import (
+            format_mem0_for_system,
+            init_mem0,
+            search_long_term,
+        )
+        from astrbot.core.memory.short_term import (
+            entries_to_context_messages,
+            load_window,
+        )
+
+        logger.info(
+            "Mem0 即将应用：umo=%s, active_max=%s, has_config=%s",
+            event.unified_msg_origin,
+            config.mem0_active_max,
+            bool(config.mem0_config),
+        )
+
+        if config.mem0_config:
+            init_mem0(config.mem0_config)
+        window = await load_window(event.unified_msg_origin)
+        logger.info(
+            "短期窗口加载完成：umo=%s, entries=%d",
+            event.unified_msg_origin,
+            len(window.entries),
+        )
+        req.contexts = entries_to_context_messages(window.entries)
+        event.set_extra("short_term_window", window)
+
+        query = req.prompt or "[当前消息]"
+        mem0_memories = await search_long_term(
+            event.unified_msg_origin,
+            query,
+            limit=5,
+        )
+        logger.info(
+            "Mem0 search 完成：umo=%s, 注入条数=%d",
+            event.unified_msg_origin,
+            len(mem0_memories),
+        )
+        if mem0_memories:
+            req.system_prompt += "\n\n" + format_mem0_for_system(mem0_memories)
+        event.set_extra("mem0_injected", mem0_memories or [])
+    except Exception as exc:
+        logger.warning("Mem0/短期窗口 应用失败: %s", exc)
 
 
 def _apply_prompt_prefix(req: ProviderRequest, cfg: dict) -> None:
@@ -1038,7 +1103,14 @@ async def build_main_agent(
 
             conversation = await _get_session_conv(event, plugin_context)
             req.conversation = conversation
-            req.contexts = json.loads(conversation.history)
+            if config.mem0_enabled:
+                await _apply_mem0_and_short_term(event, req, config)
+            else:
+                logger.info(
+                    "Mem0 总开关为 False，本轮使用传统会话上下文。umo=%s",
+                    event.unified_msg_origin,
+                )
+                req.contexts = json.loads(conversation.history)
             event.set_extra("provider_request", req)
 
     if isinstance(req.contexts, str):

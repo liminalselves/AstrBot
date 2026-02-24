@@ -219,6 +219,39 @@
         "llm_compress_provider_id": {
           "description": "Model Provider ID for Context Compression",
           "hint": "When left empty, will fall back to the 'Truncate by Turns' strategy."
+        },
+        "mem0_enabled": {
+          "description": "Enable Mem0 long-term memory",
+          "hint": "When enabled, Mem0 will be used to store long-term conversation memories."
+        },
+        "mem0_active_max": {
+          "description": "Short-term active window limit",
+          "hint": "Conversations exceeding this number of turns will be marked as pending and submitted to Mem0."
+        },
+        "mem0_config": {
+          "llm": {
+            "provider": {
+              "description": "Mem0 LLM provider",
+              "hint": "For example: openai, openai-compatible, etc."
+            },
+            "config": {
+              "api_base": {
+                "description": "Mem0 LLM API Base URL",
+                "hint": "For example: https://your-openai-compatible-endpoint/v1."
+              },
+              "api_key": {
+                "description": "Mem0 LLM API Key"
+              },
+              "model": {
+                "description": "Mem0 LLM model ID",
+                "hint": "For example: gpt-4o-mini, deepseek-chat, etc."
+              },
+              "prompt": {
+                "description": "Mem0 LLM Prompt",
+                "hint": "Optional. System prompt used only inside Mem0. Leave empty to use Mem0 default behavior."
+              }
+            }
+          }
         }
       }
     },

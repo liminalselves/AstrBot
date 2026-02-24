@@ -65,6 +65,9 @@ dependencies = [
   "packaging>=24.2",
 ]
 
+[project.optional-dependencies]
+mem0 = ["mem0ai>=0.1.0"]
+
 [dependency-groups]
 dev = [
   "commitizen>=4.9.1",

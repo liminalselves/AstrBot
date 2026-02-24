@@ -99,6 +99,10 @@ DEFAULT_CONFIG = {
         "max_context_length": -1,
         "dequeue_context_length": 1,
         "streaming_response": False,
+        # Mem0 长期记忆 + 短期窗口开关及配置
+        "mem0_enabled": False,
+        "mem0_active_max": 30,
+        "mem0_config": None,
         "show_tool_use_status": False,
         "sanitize_context_by_modalities": False,
         "max_quoted_fallback_images": 20,
@@ -2303,6 +2307,42 @@ CONFIG_METADATA_2 = {
                     "streaming_response": {
                         "type": "bool",
                     },
+                    "mem0_enabled": {
+                        "type": "bool",
+                    },
+                    "mem0_active_max": {
+                        "type": "int",
+                    },
+                    "mem0_config": {
+                        "type": "object",
+                        "items": {
+                            "llm": {
+                                "type": "object",
+                                "items": {
+                                    "provider": {
+                                        "type": "string",
+                                    },
+                                    "config": {
+                                        "type": "object",
+                                        "items": {
+                                            "api_base": {
+                                                "type": "string",
+                                            },
+                                            "api_key": {
+                                                "type": "string",
+                                            },
+                                            "model": {
+                                                "type": "string",
+                                            },
+                                            "prompt": {
+                                                "type": "text",
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
                     "show_tool_use_status": {
                         "type": "bool",
                     },
@@ -2922,6 +2962,73 @@ CONFIG_METADATA_3 = {
                         "condition": {
                             "provider_settings.context_limit_reached_strategy": "llm_compress",
                             "provider_settings.agent_runner_type": "local",
+                        },
+                    },
+                    "provider_settings.mem0_enabled": {
+                        "description": "启用 Mem0 长期记忆",
+                        "type": "bool",
+                        "condition": {
+                            "provider_settings.agent_runner_type": "local",
+                            "provider_settings.enable": True,
+                        },
+                    },
+                    "provider_settings.mem0_active_max": {
+                        "description": "短期窗口 active 上限",
+                        "type": "int",
+                        "hint": "超过此轮数的对话会被标记为 pending 并尝试写入 Mem0。",
+                        "condition": {
+                            "provider_settings.mem0_enabled": True,
+                            "provider_settings.agent_runner_type": "local",
+                            "provider_settings.enable": True,
+                        },
+                    },
+                    "provider_settings.mem0_config.llm.provider": {
+                        "description": "Mem0 LLM 提供商",
+                        "type": "string",
+                        "hint": "例如 openai、openai-compatible 等。",
+                        "condition": {
+                            "provider_settings.mem0_enabled": True,
+                            "provider_settings.agent_runner_type": "local",
+                            "provider_settings.enable": True,
+                        },
+                    },
+                    "provider_settings.mem0_config.llm.config.api_base": {
+                        "description": "Mem0 LLM API Base URL",
+                        "type": "string",
+                        "hint": "例如 https://your-openai-compatible-endpoint/v1。",
+                        "condition": {
+                            "provider_settings.mem0_enabled": True,
+                            "provider_settings.agent_runner_type": "local",
+                            "provider_settings.enable": True,
+                        },
+                    },
+                    "provider_settings.mem0_config.llm.config.api_key": {
+                        "description": "Mem0 LLM API Key",
+                        "type": "string",
+                        "condition": {
+                            "provider_settings.mem0_enabled": True,
+                            "provider_settings.agent_runner_type": "local",
+                            "provider_settings.enable": True,
+                        },
+                    },
+                    "provider_settings.mem0_config.llm.config.model": {
+                        "description": "Mem0 LLM 模型 ID",
+                        "type": "string",
+                        "hint": "例如 gpt-4o-mini, deepseek-chat 等。",
+                        "condition": {
+                            "provider_settings.mem0_enabled": True,
+                            "provider_settings.agent_runner_type": "local",
+                            "provider_settings.enable": True,
+                        },
+                    },
+                    "provider_settings.mem0_config.llm.config.prompt": {
+                        "description": "Mem0 LLM Prompt",
+                        "type": "text",
+                        "hint": "可选。只在 Mem0 内部使用的 system 提示词。留空使用 Mem0 默认行为。",
+                        "condition": {
+                            "provider_settings.mem0_enabled": True,
+                            "provider_settings.agent_runner_type": "local",
+                            "provider_settings.enable": True,
                         },
                     },
                 },

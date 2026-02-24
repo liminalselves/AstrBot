@@ -124,6 +124,9 @@ class InternalAgentSubStage(Stage):
             subagent_orchestrator=conf.get("subagent_orchestrator", {}),
             timezone=self.ctx.plugin_manager.context.get_config().get("timezone"),
             max_quoted_fallback_images=settings.get("max_quoted_fallback_images", 20),
+            mem0_enabled=settings.get("mem0_enabled", False),
+            mem0_config=settings.get("mem0_config"),
+            mem0_active_max=settings.get("mem0_active_max", 30),
         )
 
     async def process(
@@ -392,6 +395,69 @@ class InternalAgentSubStage(Stage):
         if runner_stats:
             # token_usage = runner_stats.token_usage.total
             token_usage = llm_response.usage.total if llm_response.usage else None
+
+        window = event.get_extra("short_term_window")
+        if window is None:
+            logger.info(
+                "short_term_window 不存在，本轮不执行短期窗口保存。umo=%s",
+                event.unified_msg_origin,
+            )
+        else:
+            try:
+                from astrbot.core.memory.mem0_bridge import add_from_pending
+                from astrbot.core.memory.short_term import (
+                    append_turn,
+                    remove_pending_after_add,
+                    save_window,
+                    slide_and_collect_pending,
+                )
+
+                def _text_from_content(c: str | list) -> str:
+                    if isinstance(c, str):
+                        return c
+                    if isinstance(c, list):
+                        parts = []
+                        for p in c:
+                            if isinstance(p, dict) and p.get("type") == "text":
+                                parts.append(p.get("text", ""))
+                            elif isinstance(p, str):
+                                parts.append(p)
+                        return " ".join(parts)
+                    return str(c) if c else ""
+
+                last_user = ""
+                last_assistant = llm_response.completion_text or ""
+                for m in reversed(message_to_save):
+                    role = m.get("role", "")
+                    content = m.get("content", "")
+                    txt = _text_from_content(content)
+                    if role == "assistant" and not last_assistant and txt:
+                        last_assistant = txt
+                    elif role == "user" and txt:
+                        last_user = txt
+                        break
+                if last_user or last_assistant:
+                    append_turn(window, last_user, last_assistant)
+                    pending = slide_and_collect_pending(
+                        window,
+                        active_max=getattr(
+                            self.main_agent_cfg,
+                            "mem0_active_max",
+                            30,
+                        ),
+                    )
+                    if pending:
+                        ok = await add_from_pending(event.unified_msg_origin, pending)
+                        if ok:
+                            remove_pending_after_add(window, pending)
+                    await save_window(window)
+                    logger.info(
+                        "短期窗口保存完成：umo=%s, entries=%d",
+                        event.unified_msg_origin,
+                        len(window.entries),
+                    )
+            except Exception as e:
+                logger.warning("短期窗口/Mem0 保存失败: %s", e)
 
         await self.conv_manager.update_conversation(
             event.unified_msg_origin,

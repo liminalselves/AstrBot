@@ -222,6 +222,39 @@
         "llm_compress_provider_id": {
           "description": "用于上下文压缩的模型提供商 ID",
           "hint": "留空时将降级为\"按对话轮数截断\"的策略。"
+        },
+        "mem0_enabled": {
+          "description": "启用 Mem0 长期记忆",
+          "hint": "开启后，将使用 Mem0 存储长期对话记忆。"
+        },
+        "mem0_active_max": {
+          "description": "短期窗口 active 上限",
+          "hint": "超过此轮数的对话会被标记为 pending 并尝试写入 Mem0。"
+        },
+        "mem0_config": {
+          "llm": {
+            "provider": {
+              "description": "Mem0 LLM 提供商",
+              "hint": "例如 openai、openai-compatible 等。"
+            },
+            "config": {
+              "api_base": {
+                "description": "Mem0 LLM API Base URL",
+                "hint": "例如 https://your-openai-compatible-endpoint/v1。"
+              },
+              "api_key": {
+                "description": "Mem0 LLM API Key"
+              },
+              "model": {
+                "description": "Mem0 LLM 模型 ID",
+                "hint": "例如 gpt-4o-mini, deepseek-chat 等。"
+              },
+              "prompt": {
+                "description": "Mem0 LLM Prompt",
+                "hint": "可选。只在 Mem0 内部使用的 system 提示词。留空使用 Mem0 默认行为。"
+              }
+            }
+          }
         }
       }
     },

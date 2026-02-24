@@ -15,6 +15,38 @@ from openai.types.chat.chat_completion import ChatCompletion
 from openai.types.chat.chat_completion_chunk import ChatCompletionChunk
 from openai.types.completion_usage import CompletionUsage
 
+
+def _patch_openai_compat_model_dump() -> None:
+    """
+    Work around OpenAI SDK + Pydantic compatibility issue:
+    OpenAI SDK calls openai._compat.model_dump(by_alias=None), but newer Pydantic
+    rejects None for by_alias (expects bool).
+    """
+    try:
+        from openai import _compat  # type: ignore
+        import openai._base_client as _base_client  # type: ignore
+
+        if getattr(_compat, "_astrbot_patched_model_dump", False):
+            return
+
+        orig = _compat.model_dump
+
+        def patched_model_dump(model, *args, **kwargs):  # type: ignore
+            if kwargs.get("by_alias", None) is None:
+                kwargs["by_alias"] = False
+            return orig(model, *args, **kwargs)
+
+        _compat.model_dump = patched_model_dump  # type: ignore
+        # _base_client binds model_dump at import time; patch the bound reference too.
+        if getattr(_base_client, "model_dump", None) is not None:
+            _base_client.model_dump = patched_model_dump  # type: ignore
+        _compat._astrbot_patched_model_dump = True  # type: ignore
+    except Exception:
+        return
+
+
+_patch_openai_compat_model_dump()
+
 import astrbot.core.message.components as Comp
 from astrbot import logger
 from astrbot.api.provider import Provider
