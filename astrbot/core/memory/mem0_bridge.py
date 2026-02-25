@@ -25,9 +25,10 @@ def _create_memory(config: dict | None = None) -> Any | None:
         return None
     try:
         if config:
-            # 从 AstrBot 的 mem0_config 中提取 LLM 配置，尽量自动补全 Mem0 需要的参数
+            # 从 AstrBot 的 mem0_config 中提取 LLM / embedder 配置，尽量自动补全 Mem0 需要的参数
             import os
 
+            # 1) 处理 LLM 配置
             llm = (config or {}).get("llm") or {}
             llm_conf = llm.get("config") or {}
 
@@ -48,6 +49,19 @@ def _create_memory(config: dict | None = None) -> Any | None:
                 llm["config"] = llm_conf
                 config["llm"] = llm
 
+            # 2) 处理 embedder 配置（结构与 llm 相同，但走 BaseEmbedderConfig）
+            embedder = (config or {}).get("embedder") or {}
+            embed_conf = embedder.get("config") or {}
+            embed_api_base = embed_conf.get("api_base") or embed_conf.get("openai_base_url")
+
+            if embed_api_base:
+                # 同样避免把 api_base 这种 Mem0 不认识的字段传进去
+                if "api_base" in embed_conf:
+                    embed_conf.pop("api_base", None)
+                embed_conf.setdefault("openai_base_url", str(embed_api_base))
+                embedder["config"] = embed_conf
+                config["embedder"] = embedder
+
             return cls.from_config(config)
         return cls()
     except Exception as exc:
@@ -64,7 +78,10 @@ def init_mem0(config: dict | None = None) -> bool:
     """初始化 Mem0 实例。"""
     global _mem0_instance, _mem0_config
     _mem0_config = config
-    _mem0_instance = _create_memory(config) if config else None
+    # 避免在同一进程内重复初始化底层存储（如本地 Qdrant），
+    # 导致 Windows 上出现 [WinError 32] 文件被占用。
+    if _mem0_instance is None and config:
+        _mem0_instance = _create_memory(config)
     return _mem0_instance is not None
 
 

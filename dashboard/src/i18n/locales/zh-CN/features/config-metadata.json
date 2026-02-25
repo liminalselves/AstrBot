@@ -254,6 +254,25 @@
                 "hint": "可选。只在 Mem0 内部使用的 system 提示词。留空使用 Mem0 默认行为。"
               }
             }
+          },
+          "embedder": {
+            "provider": {
+              "description": "Mem0 向量模型提供商",
+              "hint": "例如 openai、openai-compatible 等。"
+            },
+            "config": {
+              "api_base": {
+                "description": "Mem0 向量模型 API Base URL",
+                "hint": "通常与上面的 LLM API Base 一致。"
+              },
+              "api_key": {
+                "description": "Mem0 向量模型 API Key"
+              },
+              "model": {
+                "description": "Mem0 向量模型 ID",
+                "hint": "例如 text-embedding-3-small、bge-large-zh 等。"
+              }
+            }
           }
         }
       }

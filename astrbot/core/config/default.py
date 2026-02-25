@@ -2342,6 +2342,28 @@ CONFIG_METADATA_2 = {
                                     },
                                 },
                             },
+                            "embedder": {
+                                "type": "object",
+                                "items": {
+                                    "provider": {
+                                        "type": "string",
+                                    },
+                                    "config": {
+                                        "type": "object",
+                                        "items": {
+                                            "api_base": {
+                                                "type": "string",
+                                            },
+                                            "api_key": {
+                                                "type": "string",
+                                            },
+                                            "model": {
+                                                "type": "string",
+                                            },
+                                        },
+                                    },
+                                },
+                            },
                         },
                     },
                     "show_tool_use_status": {
@@ -3029,6 +3051,45 @@ CONFIG_METADATA_3 = {
                         "description": "Mem0 LLM Prompt",
                         "type": "text",
                         "hint": "可选。只在 Mem0 内部使用的 system 提示词。留空使用 Mem0 默认行为。",
+                        "condition": {
+                            "provider_settings.mem0_enabled": True,
+                            "provider_settings.agent_runner_type": "local",
+                            "provider_settings.enable": True,
+                        },
+                    },
+                    "provider_settings.mem0_config.embedder.provider": {
+                        "description": "Mem0 向量模型提供商",
+                        "type": "string",
+                        "hint": "例如 openai、openai-compatible 等。",
+                        "condition": {
+                            "provider_settings.mem0_enabled": True,
+                            "provider_settings.agent_runner_type": "local",
+                            "provider_settings.enable": True,
+                        },
+                    },
+                    "provider_settings.mem0_config.embedder.config.api_base": {
+                        "description": "Mem0 向量模型 API Base URL",
+                        "type": "string",
+                        "hint": "通常与上面的 LLM API Base 一致。",
+                        "condition": {
+                            "provider_settings.mem0_enabled": True,
+                            "provider_settings.agent_runner_type": "local",
+                            "provider_settings.enable": True,
+                        },
+                    },
+                    "provider_settings.mem0_config.embedder.config.api_key": {
+                        "description": "Mem0 向量模型 API Key",
+                        "type": "string",
+                        "condition": {
+                            "provider_settings.mem0_enabled": True,
+                            "provider_settings.agent_runner_type": "local",
+                            "provider_settings.enable": True,
+                        },
+                    },
+                    "provider_settings.mem0_config.embedder.config.model": {
+                        "description": "Mem0 向量模型 ID",
+                        "type": "string",
+                        "hint": "例如 text-embedding-3-small、bge-large-zh 等。",
                         "condition": {
                             "provider_settings.mem0_enabled": True,
                             "provider_settings.agent_runner_type": "local",

@@ -33,7 +33,8 @@ def _get_session_lock(session_id: str) -> asyncio.Lock:
 
 
 def _path(session_id: str) -> str:
-    safe = "".join(c if c.isalnum() or c in "-_:" else "_" for c in session_id)
+    # Windows 文件名不允许包含 ":" 等字符，这里做一次保守替换
+    safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in session_id)
     return os.path.join(_DIR, f"{safe}.json")
 
 

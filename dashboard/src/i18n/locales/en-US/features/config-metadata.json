@@ -251,6 +251,25 @@
                 "hint": "Optional. System prompt used only inside Mem0. Leave empty to use Mem0 default behavior."
               }
             }
+          },
+          "embedder": {
+            "provider": {
+              "description": "Mem0 embedding provider",
+              "hint": "For example: openai, openai-compatible, etc."
+            },
+            "config": {
+              "api_base": {
+                "description": "Mem0 embedding API Base URL",
+                "hint": "Usually the same as the LLM API Base above."
+              },
+              "api_key": {
+                "description": "Mem0 embedding API Key"
+              },
+              "model": {
+                "description": "Mem0 embedding model ID",
+                "hint": "For example: text-embedding-3-small, bge-large-zh, etc."
+              }
+            }
           }
         }
       }
