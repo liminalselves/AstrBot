@@ -351,7 +351,6 @@ class InternalAgentSubStage(Stage):
     ) -> None:
         if not req or not req.conversation:
             return
-
         if not llm_response and not user_aborted:
             return
 
@@ -403,61 +402,80 @@ class InternalAgentSubStage(Stage):
                 event.unified_msg_origin,
             )
         else:
-            try:
-                from astrbot.core.memory.mem0_bridge import add_from_pending
-                from astrbot.core.memory.short_term import (
-                    append_turn,
-                    remove_pending_after_add,
-                    save_window,
-                    slide_and_collect_pending,
+            from astrbot.core.memory.mem0_bridge import add_from_pending
+            from astrbot.core.memory.short_term import (
+                append_turn,
+                remove_pending_after_add,
+                save_window,
+                slide_and_collect_pending,
+            )
+
+            def _text_from_content(c: str | list) -> str:
+                if isinstance(c, str):
+                    return c
+                if isinstance(c, list):
+                    parts = []
+                    for p in c:
+                        if isinstance(p, dict) and p.get("type") == "text":
+                            parts.append(p.get("text", ""))
+                        elif isinstance(p, str):
+                            parts.append(p)
+                    return " ".join(parts)
+                return str(c) if c else ""
+
+            last_user = ""
+            last_assistant = llm_response.completion_text or ""
+            for m in reversed(message_to_save):
+                role = m.get("role", "")
+                content = m.get("content", "")
+                txt = _text_from_content(content)
+                if role == "assistant" and not last_assistant and txt:
+                    last_assistant = txt
+                elif role == "user" and txt:
+                    last_user = txt
+                    break
+
+            if last_user or last_assistant:
+                append_turn(window, last_user, last_assistant)
+                pending = slide_and_collect_pending(
+                    window,
+                    active_max=getattr(
+                        self.main_agent_cfg,
+                        "mem0_active_max",
+                        30,
+                    ),
                 )
 
-                def _text_from_content(c: str | list) -> str:
-                    if isinstance(c, str):
-                        return c
-                    if isinstance(c, list):
-                        parts = []
-                        for p in c:
-                            if isinstance(p, dict) and p.get("type") == "text":
-                                parts.append(p.get("text", ""))
-                            elif isinstance(p, str):
-                                parts.append(p)
-                        return " ".join(parts)
-                    return str(c) if c else ""
-
-                last_user = ""
-                last_assistant = llm_response.completion_text or ""
-                for m in reversed(message_to_save):
-                    role = m.get("role", "")
-                    content = m.get("content", "")
-                    txt = _text_from_content(content)
-                    if role == "assistant" and not last_assistant and txt:
-                        last_assistant = txt
-                    elif role == "user" and txt:
-                        last_user = txt
-                        break
-                if last_user or last_assistant:
-                    append_turn(window, last_user, last_assistant)
-                    pending = slide_and_collect_pending(
-                        window,
-                        active_max=getattr(
-                            self.main_agent_cfg,
-                            "mem0_active_max",
-                            30,
-                        ),
-                    )
-                    if pending:
+                if pending:
+                    try:
                         ok = await add_from_pending(event.unified_msg_origin, pending)
-                        if ok:
+                        if not ok:
+                            logger.warning(
+                                "Mem0 add_from_pending 返回 False，pending 将保留以便下次重试。umo=%s",
+                                event.unified_msg_origin,
+                            )
+                        else:
                             remove_pending_after_add(window, pending)
+                    except Exception as exc:  # noqa: BLE001
+                        logger.error(
+                            "Mem0 add_from_pending 异常，pending 将保留以便下次重试。umo=%s, err=%s",
+                            event.unified_msg_origin,
+                            exc,
+                        )
+
+                try:
                     await save_window(window)
                     logger.info(
                         "短期窗口保存完成：umo=%s, entries=%d",
                         event.unified_msg_origin,
                         len(window.entries),
                     )
-            except Exception as e:
-                logger.warning("短期窗口/Mem0 保存失败: %s", e)
+                except Exception as exc:  # noqa: BLE001
+                    logger.error(
+                        "短期窗口保存失败，将在下次会话尝试恢复。umo=%s, err=%s",
+                        event.unified_msg_origin,
+                        exc,
+                    )
 
         await self.conv_manager.update_conversation(
             event.unified_msg_origin,

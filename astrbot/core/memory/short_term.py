@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from datetime import datetime, timezone
+from typing import Dict
+
+import asyncio
 
 from astrbot.core import logger
 from astrbot.core.utils.astrbot_path import get_astrbot_data_path
@@ -13,6 +17,19 @@ from .models import ShortTermEntry, ShortTermWindow
 
 _ACTIVE_MAX = 30
 _DIR = os.path.join(get_astrbot_data_path(), "short_term_memory")
+
+# 基于 session_id 的并发锁，确保同一会话的短期窗口读写是串行的。
+_SESSION_LOCKS: Dict[str, asyncio.Lock] = {}
+_SESSION_LOCKS_GUARD = threading.Lock()
+
+
+def _get_session_lock(session_id: str) -> asyncio.Lock:
+    with _SESSION_LOCKS_GUARD:
+        lock = _SESSION_LOCKS.get(session_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            _SESSION_LOCKS[session_id] = lock
+        return lock
 
 
 def _path(session_id: str) -> str:
@@ -40,17 +57,19 @@ def _dict_to_entry(d: dict) -> ShortTermEntry:
 
 async def load_window(session_id: str) -> ShortTermWindow:
     """从落盘文件加载短期窗口。"""
-    p = _path(session_id)
-    if not os.path.exists(p):
-        return ShortTermWindow(session_id=session_id)
-    try:
-        with open(p, encoding="utf-8") as f:
-            data = json.load(f)
-    except Exception as exc:
-        logger.warning("短期窗口加载失败 %s: %s", session_id, exc)
-        return ShortTermWindow(session_id=session_id)
-    entries = [_dict_to_entry(d) for d in data.get("entries", [])]
-    return ShortTermWindow(session_id=session_id, entries=entries)
+    lock = _get_session_lock(session_id)
+    async with lock:
+        p = _path(session_id)
+        if not os.path.exists(p):
+            return ShortTermWindow(session_id=session_id)
+        try:
+            with open(p, encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as exc:
+            logger.warning("短期窗口加载失败 %s: %s", session_id, exc)
+            return ShortTermWindow(session_id=session_id)
+        entries = [_dict_to_entry(d) for d in data.get("entries", [])]
+        return ShortTermWindow(session_id=session_id, entries=entries)
 
 
 def _save_sync(window: ShortTermWindow) -> None:
@@ -74,9 +93,9 @@ def _save_sync(window: ShortTermWindow) -> None:
 
 async def save_window(window: ShortTermWindow) -> None:
     """将短期窗口落盘。"""
-    import asyncio
-
-    await asyncio.to_thread(_save_sync, window)
+    lock = _get_session_lock(window.session_id)
+    async with lock:
+        await asyncio.to_thread(_save_sync, window)
 
 
 def entries_to_context_messages(entries: list[ShortTermEntry]) -> list[dict]:
