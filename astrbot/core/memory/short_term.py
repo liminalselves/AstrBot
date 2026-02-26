@@ -113,20 +113,27 @@ def slide_and_collect_pending(
     active_max: int = _ACTIVE_MAX,
 ) -> list[ShortTermEntry]:
     """
-    当 active 超过 active_max 时，将最旧的 active 标记为 pending。
+    当 active 超过 active_max 时，将最旧的 active 逐个标记为 pending，直到 active 数量符合配置。
     返回本轮需要提交 Mem0.add 的 pending 条目（成功后可清除）。
     """
     active_indices = [i for i, e in enumerate(window.entries) if e.tag == "active"]
     if len(active_indices) <= active_max:
         return []
-    to_mark = active_indices[0]
-    e = window.entries[to_mark]
-    window.entries[to_mark] = ShortTermEntry(
-        tag="pending",
-        user=e.user,
-        assistant=e.assistant,
-        timestamp=e.timestamp,
-    )
+
+    # 计算需要标记为 pending 的数量
+    to_mark_count = len(active_indices) - active_max
+
+    # 从最旧的开始标记
+    for i in range(to_mark_count):
+        idx = active_indices[i]
+        e = window.entries[idx]
+        window.entries[idx] = ShortTermEntry(
+            tag="pending",
+            user=e.user,
+            assistant=e.assistant,
+            timestamp=e.timestamp,
+        )
+
     pending_list = [x for x in window.entries if x.tag == "pending"]
     return list(pending_list)
 

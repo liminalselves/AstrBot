@@ -276,6 +276,12 @@ async def _apply_mem0_and_short_term(
             entries_to_context_messages,
             load_window,
         )
+        from astrbot.core.memory.mem0_bridge import add_from_pending
+        from astrbot.core.memory.short_term import (
+            slide_and_collect_pending,
+            remove_pending_after_add,
+            save_window,
+        )
 
         logger.info(
             "Mem0 即将应用：umo=%s, active_max=%s, has_config=%s",
@@ -292,6 +298,22 @@ async def _apply_mem0_and_short_term(
             event.unified_msg_origin,
             len(window.entries),
         )
+
+        # 根据当前配置重新检查 active 数量，使配置实时生效
+        pending = slide_and_collect_pending(window, active_max=config.mem0_active_max)
+        if pending:
+            logger.info(
+                "根据配置 %s 检测到 %d 条过期 active，转换为 pending 并提交 Mem0",
+                config.mem0_active_max,
+                len(pending),
+            )
+            ok = await add_from_pending(event.unified_msg_origin, pending)
+            if ok:
+                remove_pending_after_add(window, pending)
+                await save_window(window)
+            else:
+                logger.warning("Mem0 add 失败，pending 保留在窗口中")
+
         req.contexts = entries_to_context_messages(window.entries)
         event.set_extra("short_term_window", window)
 
